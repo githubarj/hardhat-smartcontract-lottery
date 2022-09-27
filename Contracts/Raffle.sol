@@ -15,6 +15,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 error Raffle__NotEnoughETHEntered();
 error Raffle__TransferFailed();
 error Raffle__NotOpen();
+error Raffle__UpKeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
 
 contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     /* Type declarations */
@@ -89,15 +90,35 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
      */
     function checkUpkeep(
         bytes calldata /*checkData*/
-    ) external override returns (bool upKeepNeeded, bytes memory /* performData */) {
+    )
+        public
+        override
+        returns (
+            bool upKeepNeeded,
+            bytes memory /* performData */
+        )
+    {
         bool isOpen = (RaffleState.OPEN == s_raffleState);
         bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
         bool hasPlayers = (s_players.length > 0);
         bool hasBalance = address(this).balance > 0;
-        upKeepNeeded = ( isOpen && timePassed && hasBalance && hasPlayers);
+        upKeepNeeded = (isOpen && timePassed && hasBalance && hasPlayers);
     }
 
-    function requestRandomWinner() external {
+    function performUpkeep(
+        bytes calldata /* performData */
+    ) external override{
+
+        (bool upKeepNeeded, ) = checkUpkeep("");
+        if (!upKeepNeeded) {
+            revert Raffle__UpKeepNotNeeded(
+                address(this).balance,
+                s_players.length,
+                uint256(s_raffleState)
+            );
+        }
+
+
         // request random number
         // do something with it
         s_raffleState = RaffleState.CALCULATING;
@@ -112,12 +133,16 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
         emit RequestedRaffleWinner(requestId);
     }
 
-    function fulfillRandomWords(uint256 /*requestId*/, uint256[] memory randomWords) internal override {
+    function fulfillRandomWords(
+        uint256, /*requestId*/
+        uint256[] memory randomWords
+    ) internal override {
         uint256 imdexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[imdexOfWinner];
         s_recentWinner = recentWinner;
         s_raffleState = RaffleState.OPEN;
         s_players = new address payable[](0);
+        s_lastTimeStamp = block.timestamp;
         (bool success, ) = recentWinner.call{value: address(this).balance}("");
         if (!success) {
             revert Raffle__TransferFailed();
