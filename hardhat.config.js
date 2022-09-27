@@ -27,6 +27,12 @@ module.exports = {
             accounts: [PRIVATE_KEY],
         },
     },
+    gasReporter: {
+        enabled: false,
+        currency: "USD",
+        outputFile: "gas-report.txt",
+        noColours: true,
+    },
     solidity: "0.8.8",
     namedAccounts: {
         deployer: {
