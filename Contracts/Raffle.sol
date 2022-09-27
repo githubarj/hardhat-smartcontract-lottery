@@ -10,7 +10,8 @@ pragma solidity ^0.8.8;
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 
-error Raffle_NotEnoughETHEntered();
+error Raffle__NotEnoughETHEntered();
+error Raffle__TransferFailed();
 
 contract Raffle is VRFConsumerBaseV2 {
     // State variables
@@ -25,10 +26,14 @@ contract Raffle is VRFConsumerBaseV2 {
     uint32 private immutable i_callbackGasLImit;
     uint32 private constant NUMWORDS = 1;
 
+    //lottery variables
+    address private s_recentWinner;
+
     // Events
     // namming convection is the function name reversed
     event RaffleEnter(address indexed player);
     event RequestedRaffleWinner(uint256 indexed requestId);
+    event WinnerPicked(address indexed winner);
 
     constructor(
         address vrfCoordinatorV2,
@@ -47,7 +52,7 @@ contract Raffle is VRFConsumerBaseV2 {
     function enterRaffle() public payable {
         // our msg.value > entrance fee to enter raffle
         if (msg.value < i_entranceFee) {
-            revert Raffle_NotEnoughETHEntered();
+            revert Raffle__NotEnoughETHEntered();
         } else {
             s_players.push(payable(msg.sender));
         }
@@ -57,7 +62,7 @@ contract Raffle is VRFConsumerBaseV2 {
     function requestRandomWinner() external {
         // request random number
         // do something with it
-        uint256 requestId =  i_vrfCoordinator.requestRandomWords(
+        uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
             i_subscriptionId,
             REQUEST_CONFIRMATIONS,
@@ -68,12 +73,15 @@ contract Raffle is VRFConsumerBaseV2 {
         emit RequestedRaffleWinner(requestId);
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords)
-        internal
-        override
-    {
+    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override {
         uint256 imdexOfWinner = randomWords[0] % s_players.length;
         address payable recentWinner = s_players[imdexOfWinner];
+        s_recentWinner = recentWinner;
+        (bool success, ) = recentWinner.call{value: address(this).balance}("");
+        if (!success) {
+            revert Raffle__TransferFailed();
+        }
+        emit WinnerPicked(recentWinner);
     }
 
     // view/pure functions
@@ -83,5 +91,9 @@ contract Raffle is VRFConsumerBaseV2 {
 
     function getPlayer(uint256 index) public view returns (address) {
         return s_players[index];
+    }
+
+    function getRecentWinner() public view returns (address) {
+        return s_recentWinner;
     }
 }
