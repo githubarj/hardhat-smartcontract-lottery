@@ -4,9 +4,9 @@ const { developmentChains } = require("../helper-hardhat-config");
 const BASE_FEE = ethers.utils.parseEther("0.25"); // 0.25 is the premium
 const GAS_PRICE_LINK = 1e9;
 
-module.exports = async function ({ getNamedAcccounts, deployments }) {
+module.exports = async function ({ getNamedAccounts, deployments }) {
     const { deploy, log } = deployments;
-    const { deployer } = await getNamedAcccounts();
+    const { deployer } = await getNamedAccounts();
     const args = [BASE_FEE, GAS_PRICE_LINK];
 
     if (developmentChains.includes(network.name)) {
@@ -17,8 +17,8 @@ module.exports = async function ({ getNamedAcccounts, deployments }) {
             log: true,
             args: args,
         });
-        log("Mocks Deployed")
-        log("---------------------------------------------------------------")
+        log("Mocks Deployed");
+        log("---------------------------------------------------------------");
     }
 };
 
